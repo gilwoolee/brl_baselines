@@ -1,0 +1,5 @@
+mle False
+Logging to /tmp/openai-2019-12-31-13-01-53-171056
+env_type: envs
+Training ppo2 on envs:wam-v0 with arguments 
+{'load_path': '/home/gilwoo/models/wam/bpo_noent/checkpoints/02950', 'network': 'mlp'}
