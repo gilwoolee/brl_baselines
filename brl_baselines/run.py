@@ -23,6 +23,7 @@ from baselines import run
 import gym
 from brl_gym import envs
 import brl_gym
+import pickle
 
 try:
     from mpi4py import MPI
@@ -427,10 +428,10 @@ def main(args):
             undiscounted_sum = []
 
             with open(args.output, 'w') as f:
-                if 'Maze' in args.env :
-                    f.write('target\treward\tnum-sensing\tlength\n')
-                else:
-                    f.write('reward\tnum-sensing\tnum-collision\tlength\n')
+                #if 'Maze' in args.env :
+                #    f.write('target\treward\tnum-sensing\tlength\n')
+                #else:
+                #    f.write('reward\tnum-sensing\tnum-collision\tlength\n')
 
                 for k in range(num_trials):
                     print('-------------------------')
@@ -445,19 +446,19 @@ def main(args):
 
                     if 'Maze' in args.env:
                         target = _env.target
-                        print("target",  target)
 
                     sensing_count = 0
                     collision_count = 0
 
                     done = False
                     rewards = []
-                    actions = []
+                    residual_actions = []
                     obses = []
                     info = []
                     t = 0
                     expert_actions = []
                     agent_pos = []
+                    observations = []
 
                     while not done:
                         print("obs :", np.around(obs, 1))
@@ -471,8 +472,9 @@ def main(args):
                             obs = np.concatenate([obs, expert_action], axis=1)
                             expert_action = expert_action.ravel()
 
-                        # import IPython; IPython.embed(); import sys; sys.exit(0)
-                        action = model.step(obs)[0][0]
+                        observations += [obs.copy()]
+                        action = model.step(obs)[0][0].numpy()
+                        residual_actions += [action]
 
                         if args.alg == 'bppo2_expert' or args.alg == 'bppo2':
 
@@ -480,16 +482,14 @@ def main(args):
                             agent_pos += [obs.ravel()[:2]]
                             expert_actions += [expert_action.copy()]
 
-                            print("action", action, "expert",  expert_action, "\n")
+                            print("action", action, "expert",  expert_action,)
                             if 'cartpole' in args.env.lower():
                                 expert_action = expert_action + action * w
                             else:
                                 expert_action = (1.0 - w)*expert_action + action * w
                             action = expert_action
-                            actions += [expert_action.numpy().copy()]
-                            if expert_action[-1] > 0:
-                                sensing_count += 1
-
+                        action = np.clip(action, env.action_space.low, env.action_space.high)
+                        print("final action", action)
                         obs, r, done, info = env.step(action)
                         print('reward:', r)
                         print('done  :', done)
@@ -513,20 +513,16 @@ def main(args):
                         obses += [obs]
                         # actions += [action]
 
-                    # print(np.sum(rewards), "Sensing", sensing_count, collision_count, len(rewards))
+                    rewards = np.array(rewards).ravel()
+                    residual_actions = np.array(residual_actions).squeeze()
+                    observations = np.array(observations).squeeze()
+                    data = {"r":rewards, "action":residual_actions, "obs":observations}
+                    os.makedirs('trials', exist_ok=True)
+                    data_file = open("trials/trial_{}.pkl".format(k), 'wb+')
+                    pickle.dump(data, data_file)
+                    print("Wrote to trial_{}.pkl".format(k))
 
                     all_rewards += [np.sum(rewards)]
-                    if 'Maze' in args.env :
-                        f.write('{}\t{}\t{}\t{}\n'.format(target, np.sum(rewards), sensing_count, len(rewards)))
-                    else:
-                        f.write('{}\t{}\t{}\n'.format(np.sum(rewards), sensing_count, collision_count, len(rewards)))
-
-                    expert_actions = np.array(expert_actions)
-                    agent_pos = np.array(agent_pos)
-                    actions = np.array(actions)
-                    np.savetxt("expert_action.csv", expert_actions, delimiter=",", fmt="%.2f")
-                    np.savetxt("agent_pos.csv", agent_pos, delimiter=",", fmt="%.2f")
-                    np.savetxt("actions.csv", actions, delimiter=",", fmt="%.2f")
 
         env.close()
         mean = np.mean(all_rewards)
