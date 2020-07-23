@@ -23,7 +23,7 @@ def constfn(val):
 def learn(network, env, total_timesteps, expert, residual_weight=0.1,
             eval_env = None, seed=None, nsteps=2048, ent_coef=0.0, lr=3e-4,
             vf_coef=0.5,  max_grad_norm=0.5, gamma=0.99, lam=0.95,
-            log_interval=10, nminibatches=4, noptepochs=4, cliprange=0.2,
+            log_interval=1, nminibatches=4, noptepochs=4, cliprange=0.2,
             save_interval=0, load_path=None, model_fn=None,
             **network_kwargs):
     '''
@@ -83,6 +83,8 @@ def learn(network, env, total_timesteps, expert, residual_weight=0.1,
 
     set_global_seeds(seed)
     print("bppo2_expert residual_weight", residual_weight)
+    if save_interval > 0:
+        log_interval = save_interval
 
     if isinstance(lr, float): lr = constfn(lr)
     else: assert callable(lr)
@@ -118,11 +120,12 @@ def learn(network, env, total_timesteps, expert, residual_weight=0.1,
                      max_grad_norm=max_grad_norm)
 
     if load_path is not None:
-        load_path = osp.expanduser(load_path)
+        load_dir = osp.dirname(osp.expanduser(load_path))
         ckpt = tf.train.Checkpoint(model=model)
-        manager = tf.train.CheckpointManager(ckpt, load_path, max_to_keep=None)
-        ckpt.restore(manager.latest_checkpoint)
-        print("BRPO Restored " + load_path)
+        manager = tf.train.CheckpointManager(ckpt, load_dir, max_to_keep=None)
+        ckpt.restore(osp.expanduser(load_path))
+        assert (len(manager.checkpoints) > 0)
+        print("BRPO Restored " + osp.expanduser(load_path) + " from " + str(len(manager.checkpoints)) + "checkpoints.")
         if total_timesteps == 0:
             return model
     else:

@@ -427,28 +427,31 @@ def main(args):
 
             undiscounted_sum = []
 
+            #import cProfile
+
             with open(args.output, 'w') as f:
                 #if 'Maze' in args.env :
                 #    f.write('target\treward\tnum-sensing\tlength\n')
                 #else:
                 #    f.write('reward\tnum-sensing\tnum-collision\tlength\n')
+                actual_env = env.envs[0].env.env.env
+                #env = env.envs[0].env.env
+                no_collision = 0
+                lengths = []
 
                 for k in range(num_trials):
+                    #profile = cProfile.Profile()
+                    #profile.enable()
                     print('-------------------------')
                     # env.envs[0].env.env.env.env.target = 3
                     # env.envs[0].env.env.env.reset_params=False
                     obs = env.reset()
-                    actual_env = env.envs[0].env.env.env
+                    #_env = env.envs[0]
+                    #while hasattr(_env, "env"):
+                    #    _env = _env.env
 
-                    _env = env.envs[0]
-                    while hasattr(_env, "env"):
-                        _env = _env.env
-
-                    if 'Maze' in args.env:
-                        target = _env.target
-
-                    sensing_count = 0
-                    collision_count = 0
+                    #if 'Maze' in args.env:
+                     #   target = _env.target
 
                     done = False
                     rewards = []
@@ -459,15 +462,13 @@ def main(args):
                     expert_actions = []
                     agent_pos = []
                     observations = []
+                    w = extra_args['residual_weight']
+                    print("Weight", w)
 
-                    while not done:
-                        print("obs :", np.around(obs, 1))
+                    while not done and t < 500:
+                        #print("obs :", np.around(obs, 1))
 
-                        if args.alg == 'bppo2':
-                            expert_action = expert.action(obs, info)
-                            expert_action = expert_action.ravel()
-
-                        if args.alg == 'bppo2_expert' or args.alg == 'bpo_expert_no_residual':
+                        if args.alg == 'bppo2_expert':
                             expert_action = expert.action(obs, info)
                             obs = np.concatenate([obs, expert_action], axis=1)
                             expert_action = expert_action.ravel()
@@ -476,51 +477,49 @@ def main(args):
                         action = model.step(obs)[0][0].numpy()
                         residual_actions += [action]
 
-                        if args.alg == 'bppo2_expert' or args.alg == 'bppo2':
-
-                            w = extra_args['residual_weight']
+                        if args.alg == 'bppo2_expert':
                             agent_pos += [obs.ravel()[:2]]
                             expert_actions += [expert_action.copy()]
 
-                            print("action", action, "expert",  expert_action,)
+                            #print("action", action, "expert",  expert_action,)
                             if 'cartpole' in args.env.lower():
                                 expert_action = expert_action + action * w
                             else:
                                 expert_action = (1.0 - w)*expert_action + action * w
                             action = expert_action
                         action = np.clip(action, env.action_space.low, env.action_space.high)
-                        print("final action", action)
+                        #print("final action", action)
                         obs, r, done, info = env.step(action)
-                        print('reward:', r)
-                        print('done  :', done)
+                        #print('reward:', r)
+                        #print('done  :', done)
 
-                        if 'Door' in args.env and 'collision' in info[0]:
-                            collision_count += 1
-
-                        # if render:
-                        #    env.render()
                         if render:
-                            os.makedirs('imgs/trial{}'.format(k), exist_ok=True)
-                            actual_env._visualize(
-                                    filename="imgs/trial{}/crosswalk_{}.png".format(k, t))
+                           os.makedirs('imgs/trial{}'.format(k), exist_ok=True)
+                           actual_env._visualize(
+                                   filename="imgs/trial{}/crosswalk_{}.png".format(k, t))
                         t += 1
-
-                        if t > 2000:
-                            break
 
                         done = done.any() if isinstance(done, np.ndarray) else done
                         rewards += [r]
                         obses += [obs]
                         # actions += [action]
 
+                    #profile.disable()
+                    #profile.print_stats()
+                    #import IPython; IPython.embed(); import sys ;sys.exit(0)
+                    lengths += [t]
                     rewards = np.array(rewards).ravel()
-                    residual_actions = np.array(residual_actions).squeeze()
-                    observations = np.array(observations).squeeze()
-                    data = {"r":rewards, "action":residual_actions, "obs":observations}
-                    os.makedirs('trials', exist_ok=True)
-                    data_file = open("trials/trial_{}.pkl".format(k), 'wb+')
-                    pickle.dump(data, data_file)
-                    print("Wrote to trial_{}.pkl".format(k))
+                    if rewards[-1] > 0:
+                        no_collision += 1
+                    print(np.sum(rewards), no_collision)
+
+                    #residual_actions = np.array(residual_actions).squeeze()
+                    #observations = np.array(observations).squeeze()
+                    #data = {"r":rewards, "action":residual_actions, "obs":observations}
+                    #os.makedirs('trials', exist_ok=True)
+                    #data_file = open("trials/trial_{}.pkl".format(k), 'wb+')
+                    #pickle.dump(data, data_file)
+                    #print("Wrote to trial_{}.pkl".format(k))
 
                     all_rewards += [np.sum(rewards)]
 
@@ -529,6 +528,8 @@ def main(args):
         ste = np.std(all_rewards) / np.sqrt(len(all_rewards))
         print(all_rewards)
         print ("Reward stat: ", mean, "+/-", ste)
+        print("No collision" , no_collision / num_trials)
+        print("Length", np.mean(lengths))
 
     return model
 
