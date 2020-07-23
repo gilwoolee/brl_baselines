@@ -116,8 +116,12 @@ def learn(network, env, total_timesteps, expert, residual_weight=0.1,
         from baselines.ppo2.model import Model
         model_fn = Model
 
+    if load_path is not None:
+    	optimizer = None
+    else:
+    	optimizer = "MPI"
     model = model_fn(ac_space=ac_space, policy_network=network, ent_coef=ent_coef, vf_coef=vf_coef,
-                     max_grad_norm=max_grad_norm)
+                     max_grad_norm=max_grad_norm, optimizer=None)
 
     if load_path is not None:
         load_dir = osp.dirname(osp.expanduser(load_path))
@@ -126,6 +130,7 @@ def learn(network, env, total_timesteps, expert, residual_weight=0.1,
         ckpt.restore(osp.expanduser(load_path))
         assert (len(manager.checkpoints) > 0)
         print("BRPO Restored " + osp.expanduser(load_path) + " from " + str(len(manager.checkpoints)) + "checkpoints.")
+
         if total_timesteps == 0:
             return model
     else:
