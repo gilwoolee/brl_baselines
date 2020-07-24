@@ -120,11 +120,12 @@ def learn(network, env, total_timesteps, expert, residual_weight=0.1,
                      max_grad_norm=max_grad_norm)
 
     if load_path is not None:
-        load_dir = osp.dirname(osp.expanduser(load_path))
+        load_path = osp.expanduser(load_path)
+        load_dir = osp.dirname(load_path)
         ckpt = tf.train.Checkpoint(model=model)
         manager = tf.train.CheckpointManager(ckpt, load_dir, max_to_keep=None)
         ckpt.restore(osp.expanduser(load_path))
-        assert (len(manager.checkpoints) > 0)
+        assert (len(manager.checkpoints) > 0 and load_path in manager.checkpoints)
         print("BRPO Restored " + osp.expanduser(load_path) + " from " + str(len(manager.checkpoints)) + "checkpoints.")
         if total_timesteps == 0:
             return model
