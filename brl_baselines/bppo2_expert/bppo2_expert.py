@@ -121,7 +121,7 @@ def learn(network, env, total_timesteps, expert, residual_weight=0.1,
     else:
     	optimizer = "MPI"
     model = model_fn(ac_space=ac_space, policy_network=network, ent_coef=ent_coef, vf_coef=vf_coef,
-                     max_grad_norm=max_grad_norm, optimizer=None)
+                     max_grad_norm=max_grad_norm)
 
     if load_path is not None:
         load_path = osp.expanduser(load_path)
@@ -134,10 +134,10 @@ def learn(network, env, total_timesteps, expert, residual_weight=0.1,
 
         if total_timesteps == 0:
             return model
-    else:
-        save_path = osp.join(logger.get_dir(), 'checkpoints')
-        ckpt = tf.train.Checkpoint(model=model)
-        manager = tf.train.CheckpointManager(ckpt, save_path, max_to_keep=None)
+
+    save_path = osp.join(logger.get_dir(), 'checkpoints')
+    ckpt = tf.train.Checkpoint(model=model)
+    manager = tf.train.CheckpointManager(ckpt, save_path, max_to_keep=None)
 
     # Instantiate the runner object
     runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam, expert=expert, residual_weight=residual_weight)
@@ -207,8 +207,10 @@ def learn(network, env, total_timesteps, expert, residual_weight=0.1,
         lossvals = np.mean(mblossvals, axis=0)
         # End timer
         tnow = time.time()
+        print("time", tnow - tstart)
         # Calculate the fps (frame per second)
         fps = int(nbatch / (tnow - tstart))
+
         print('Update {}'.format(update))
         print('rew     ', safemean([epinfo['r'] for epinfo in epinfobuf]))
         print('len     ', safemean([epinfo['l'] for epinfo in epinfobuf]))

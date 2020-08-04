@@ -26,21 +26,18 @@ class Runner(AbstractEnvRunner):
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [],[],[],[],[],[]
         mb_states = self.states
         epinfos = []
-
         # For n in range number of steps
-        for _ in range(self.nsteps):
-            # print("Expert", self.expert)
+        for i in range(self.nsteps):
+            # start = time.time()
             expert_actions = self.expert.action(self.obs, self.infos)
-            # print("expert_actions", expert_actions)
 
             obs = np.concatenate([self.obs, expert_actions], axis=1)
-            # print(np.around(obs[0]
+
             # Given observations, get action value and neglopacs
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
             actions, values, self.states, neglogpacs = self.model.step(obs)
+            actions = actions.numpy()
             expert_actions = expert_actions * (1.0 - self.residual_weight) + actions * self.residual_weight
-            # print("residual_weight", self.residual_weight)
-            # print("actoins", actions)
 
             mb_obs.append(obs.copy())
             mb_actions.append(actions)
@@ -56,7 +53,6 @@ class Runner(AbstractEnvRunner):
                 maybeepinfo = info.get('episode')
                 if maybeepinfo: epinfos.append(maybeepinfo)
             mb_rewards.append(rewards)
-
         #batch of steps to batch of rollouts
         mb_obs = np.asarray(mb_obs, dtype=self.obs.dtype)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32)
