@@ -116,10 +116,6 @@ def learn(network, env, total_timesteps, expert, residual_weight=0.1,
         from baselines.ppo2.model import Model
         model_fn = Model
 
-    if load_path is not None:
-    	optimizer = None
-    else:
-    	optimizer = "MPI"
     model = model_fn(ac_space=ac_space, policy_network=network, ent_coef=ent_coef, vf_coef=vf_coef,
                      max_grad_norm=max_grad_norm)
 
